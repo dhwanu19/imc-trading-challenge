@@ -1,6 +1,7 @@
 from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import List
 import string
+from logger import Logger
 
 AMETHYSTS = "AMETHYSTS"
 STARFRUIT = "STARFRUIT"
@@ -17,14 +18,17 @@ DEFAULT_PRICES = {
     STARFRUIT : 5_000,
 }
 
+# visualiser custom logger (REMOVE FOR SUBMISSION and CONVERT PRINTS)
+logger = Logger()
+
 class Trader:
     def __init__(self) -> None:
-        print("Initialising...")
+        logger.print("Initialising...")
 
-        self.position_limit = (
+        self.position_limit = {
             AMETHYSTS : 20, 
             STARFRUIT : 20, 
-        )
+        }
 
         # self.round = 0
         self.shells = 0
@@ -32,7 +36,7 @@ class Trader:
         # List of price history of assets
         self.price_history = dict()
         for asset in ASSETS:
-            asset.price_history[asset] = []
+            self.price_history[asset] = []
             # Set others such as expected regresion price
         
     def starfruit_strategy():
@@ -65,33 +69,43 @@ class Trader:
     
     def run(self, state: TradingState):
         # Only method required. It takes all buy and sell orders for all symbols as an input, and outputs a list of orders to be sent
-        print("traderData: " + state.traderData)
-        print("Observations: " + str(state.observations))
-        result = {}
-        for product in state.order_depths:
-            order_depth: OrderDepth = state.order_depths[product]
-            orders: List[Order] = []
-            acceptable_price = 10;  # Participant should calculate this value
-            print("Acceptable price : " + str(acceptable_price))
-            print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
+        # print("traderData: " + state.traderData)
+        # print("Observations: " + str(state.observations))
+        # result = {}
+        # for product in state.order_depths:
+        #     order_depth: OrderDepth = state.order_depths[product]
+        #     orders: List[Order] = []
+        #     acceptable_price = 10;  # Participant should calculate this value
+        #     print("Acceptable price : " + str(acceptable_price))
+        #     print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
     
-            if len(order_depth.sell_orders) != 0:
-                best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-                if int(best_ask) < acceptable_price:
-                    print("BUY", str(-best_ask_amount) + "x", best_ask)
-                    orders.append(Order(product, best_ask, -best_ask_amount))
+        #     if len(order_depth.sell_orders) != 0:
+        #         best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
+        #         if int(best_ask) < acceptable_price:
+        #             print("BUY", str(-best_ask_amount) + "x", best_ask)
+        #             orders.append(Order(product, best_ask, -best_ask_amount))
     
-            if len(order_depth.buy_orders) != 0:
-                best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-                if int(best_bid) > acceptable_price:
-                    print("SELL", str(best_bid_amount) + "x", best_bid)
-                    orders.append(Order(product, best_bid, -best_bid_amount))
+        #     if len(order_depth.buy_orders) != 0:
+        #         best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
+        #         if int(best_bid) > acceptable_price:
+        #             print("SELL", str(best_bid_amount) + "x", best_bid)
+        #             orders.append(Order(product, best_bid, -best_bid_amount))
             
-            result[product] = orders
-    
+        #     result[product] = orders
+        
+        logger.print("traderData: " + state.traderData)
+        logger.print("Observations: " + str(state.observations))
+        
+        # only running amethyst strategy
+        result = {}
+        result[AMETHYSTS] = self.amethyst_strategy(state)
+                    
     
         traderData = "SAMPLE" # String value holding Trader state data required. It will be delivered as TradingState.traderData on next execution.
         
         conversions = 1
+        
+        # Need to flush to visualiser (include before return always)
+        logger.flush(state, result, conversions, traderData)
         return result, conversions, traderData
 
