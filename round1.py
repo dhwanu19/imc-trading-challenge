@@ -1,7 +1,8 @@
 from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import List
 import string
-from logger import Logger
+import math
+
 
 AMETHYSTS = "AMETHYSTS"
 STARFRUIT = "STARFRUIT"
@@ -19,11 +20,12 @@ DEFAULT_PRICES = {
 }
 
 # visualiser custom logger (REMOVE FOR SUBMISSION and CONVERT PRINTS)
+from logger import Logger
 logger = Logger()
 
 class Trader:
     def __init__(self) -> None:
-        logger.print("Initialising...")
+        # logger.print("Initialising...")
 
         self.position_limit = {
             AMETHYSTS : 20, 
@@ -39,8 +41,52 @@ class Trader:
             self.price_history[asset] = []
             # Set others such as expected regresion price
         
-    def starfruit_strategy():
-        pass
+        self.ema_price = None
+        self.round = 0
+        
+    def starfruit_strategy(self, state: TradingState):
+        
+        # update ema price
+        mid_price = self.get_mid_starfruit_price(state)
+        
+        if not self.ema_price:
+            self.ema_price = mid_price
+        else:
+            # Maybe have a variable alpha, where initially alpha is high then goes lower
+            
+            alpha = 0.0
+            if self.round < 30:
+                alpha = 0.75
+            else:
+                alpha = 0.5
+                
+            self.ema_price = (alpha * mid_price) + ((1 - alpha) * self.ema_price)
+        
+        # get position
+        starfruit_pos = self.get_pos(STARFRUIT, state)
+
+        bid_volume = self.position_limit[STARFRUIT] - starfruit_pos
+        ask_volume = - self.position_limit[STARFRUIT] - starfruit_pos
+
+        orders = []
+
+        if starfruit_pos == 0:
+            # Not long nor short
+            orders.append(Order(STARFRUIT, math.floor(self.ema_price - 1), bid_volume))
+            orders.append(Order(STARFRUIT, math.ceil(self.ema_price + 1), ask_volume))
+        
+        if starfruit_pos > 0:
+            # Long position
+            orders.append(Order(STARFRUIT, math.floor(self.ema_price - 2), bid_volume))
+            orders.append(Order(STARFRUIT, math.ceil(self.ema_price), ask_volume))
+
+        if starfruit_pos < 0:
+            # Short position
+            orders.append(Order(STARFRUIT, math.floor(self.ema_price), bid_volume))
+            orders.append(Order(STARFRUIT, math.ceil(self.ema_price + 2), ask_volume))
+
+        return orders
+        
     
     # market make/take around 10k
     def amethyst_strategy(self, state: TradingState):
@@ -60,7 +106,25 @@ class Trader:
         orders.append(Order(AMETHYSTS, DEFAULT_PRICES[AMETHYSTS] + price_dev, ask_volume))
         
         return orders
-    
+
+    # made for starfruit only
+    def get_mid_starfruit_price(self, state : TradingState):
+
+        default_price = self.ema_price if self.ema_price else DEFAULT_PRICES[STARFRUIT]
+
+        if STARFRUIT not in state.order_depths:
+            return default_price
+
+        market_bids = state.order_depths[STARFRUIT].buy_orders
+        market_asks = state.order_depths[STARFRUIT].sell_orders
+        if not market_asks or not market_bids:
+            return default_price
+        
+        best_bid = max(market_bids)
+        best_ask = min(market_asks)
+        
+        return (best_bid + best_ask)/2
+
     def get_pos(self, product, state: TradingState):
         # return state.position.get(product)
         # Investigate later
@@ -93,13 +157,13 @@ class Trader:
             
         #     result[product] = orders
         
-        logger.print("traderData: " + state.traderData)
-        logger.print("Observations: " + str(state.observations))
+        # logger.print("traderData: " + state.traderData)
+        # logger.print("Observations: " + str(state.observations))
         
         # only running amethyst strategy
         result = {}
         result[AMETHYSTS] = self.amethyst_strategy(state)
-                    
+        result[STARFRUIT] = self.starfruit_strategy(state)
     
         traderData = "SAMPLE" # String value holding Trader state data required. It will be delivered as TradingState.traderData on next execution.
         
@@ -107,5 +171,6 @@ class Trader:
         
         # Need to flush to visualiser (include before return always)
         logger.flush(state, result, conversions, traderData)
+        self.round += 1
         return result, conversions, traderData
 
