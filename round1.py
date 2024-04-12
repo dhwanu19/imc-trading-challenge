@@ -52,8 +52,8 @@ class Trader:
         if not self.ema_price:
             self.ema_price = mid_price
         else:
+        
             # Maybe have a variable alpha, where initially alpha is high then goes lower
-            
             alpha = 0.0
             if self.round < 30:
                 alpha = 0.75
@@ -83,7 +83,7 @@ class Trader:
         if starfruit_pos < 0:
             # Short position
             orders.append(Order(STARFRUIT, math.floor(self.ema_price), bid_volume))
-            orders.append(Order(STARFRUIT, math.ceil(self.ema_price + 2), ask_volume))
+            orders.append(Order(STARFRUIT, math.ceil(self.ema_price + 1), ask_volume)) # or take profits @ EMA + 1
 
         return orders
         
@@ -98,7 +98,7 @@ class Trader:
         bid_volume = self.position_limit[AMETHYSTS] - amethyst_pos
         ask_volume = -1 * (self.position_limit[AMETHYSTS] + amethyst_pos)
              
-        price_dev = 1
+        price_dev = 2 # Or change back to 1
         
         # append +-1 buy/sell order
         orders = []
