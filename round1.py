@@ -20,8 +20,8 @@ DEFAULT_PRICES = {
 }
 
 # visualiser custom logger (REMOVE FOR SUBMISSION and CONVERT PRINTS)
-from logger import Logger
-logger = Logger()
+#from logger import Logger
+#logger = Logger()
 
 class Trader:
     def __init__(self) -> None:
@@ -55,10 +55,10 @@ class Trader:
         
             # Maybe have a variable alpha, where initially alpha is high then goes lower
             alpha = 0.0
-            if self.round < 30:
-                alpha = 0.75
-            else:
+            if self.round < 50:
                 alpha = 0.5
+            else:
+                alpha = 0.37
                 
             self.ema_price = (alpha * mid_price) + ((1 - alpha) * self.ema_price)
         
@@ -77,12 +77,12 @@ class Trader:
         
         if starfruit_pos > 0:
             # Long position
-            orders.append(Order(STARFRUIT, math.floor(self.ema_price - 2), bid_volume))
+            orders.append(Order(STARFRUIT, math.floor(self.ema_price - 1), bid_volume))
             orders.append(Order(STARFRUIT, math.ceil(self.ema_price), ask_volume))
 
         if starfruit_pos < 0:
             # Short position
-            orders.append(Order(STARFRUIT, math.floor(self.ema_price), bid_volume))
+            orders.append(Order(STARFRUIT, math.floor(self.ema_price - 1), bid_volume))
             orders.append(Order(STARFRUIT, math.ceil(self.ema_price + 1), ask_volume)) # or take profits @ EMA + 1
 
         return orders
@@ -98,12 +98,12 @@ class Trader:
         bid_volume = self.position_limit[AMETHYSTS] - amethyst_pos
         ask_volume = -1 * (self.position_limit[AMETHYSTS] + amethyst_pos)
              
-        price_dev = 2 # Or change back to 1
+        # price_dev = 2 # Or change back to 1
         
         # append +-1 buy/sell order
         orders = []
-        orders.append(Order(AMETHYSTS, DEFAULT_PRICES[AMETHYSTS] - price_dev, bid_volume))
-        orders.append(Order(AMETHYSTS, DEFAULT_PRICES[AMETHYSTS] + price_dev, ask_volume))
+        orders.append(Order(AMETHYSTS, DEFAULT_PRICES[AMETHYSTS] - 2, bid_volume))
+        orders.append(Order(AMETHYSTS, DEFAULT_PRICES[AMETHYSTS] + 2, ask_volume))
         
         return orders
 
@@ -170,7 +170,7 @@ class Trader:
         conversions = 1
         
         # Need to flush to visualiser (include before return always)
-        logger.flush(state, result, conversions, traderData)
+        #logger.flush(state, result, conversions, traderData)
         self.round += 1
         return result, conversions, traderData
 
