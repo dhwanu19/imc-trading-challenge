@@ -1,31 +1,21 @@
-import copy
+prices = {
+    'pizza': { 'pizza': 1, 'wasabi': 0.48, 'snowball': 1.52, 'shells': 0.71 },
+    'wasabi': { 'pizza': 2.05, 'wasabi': 1, 'snowball': 3.26, 'shells': 1.56 },
+    'snowball': { 'pizza': 0.64, 'wasabi': 0.3, 'snowball': 1, 'shells': 0.46 },
+    'shells': { 'pizza': 1.41, 'wasabi': 0.61, 'snowball': 2.08, 'shells': 1 }
+}
 
-EXCHANGE_MATRIX = [
-    [1, 0.48, 1.52, 0.71],
-    [2.05, 1, 3.26, 1.56],
-    [0.64, 0.3, 1, 0.46],
-    [1.41, 0.61, 2.08, 1],
-]
+import itertools
 
-# Maximum amount of each asset possible after trades
+max_score = 1
+for path in itertools.product(['pizza', 'wasabi', 'snowball', 'shells'], repeat=4):
+    score = 1
+    score *= prices['shells'][path[0]]
+    score *= prices[path[0]][path[1]]
+    score *= prices[path[1]][path[2]]
+    score *= prices[path[2]][path[3]]
+    score *= prices[path[3]]['shells']
 
-MAX_AMOUNT = [0, 0, 0, 2_000_000]
-BEST_ROUTE = [[], [], [], []]
-
-# There are 5 trades
-for _ in range(5):
-    NEW_MAX_AMOUNT = copy.deepcopy(MAX_AMOUNT)
-    NEW_BEST_ROUTE = copy.deepcopy(BEST_ROUTE)
-
-    for target_product in range(4):
-        for origin_product in range(4):
-            quantity_target = MAX_AMOUNT[origin_product] * EXCHANGE_MATRIX[origin_product][target_product]
-            if quantity_target > NEW_MAX_AMOUNT[target_product]:
-                NEW_MAX_AMOUNT[target_product] = quantity_target
-                NEW_BEST_ROUTE[target_product] = BEST_ROUTE[origin_product] + [(origin_product, target_product)]
-
-    MAX_AMOUNT = NEW_MAX_AMOUNT
-    BEST_ROUTE = NEW_BEST_ROUTE
-
-print(MAX_AMOUNT)
-print(BEST_ROUTE)
+    if score >= max_score:
+        print(path, score)
+        max_score = score
