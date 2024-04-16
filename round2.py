@@ -153,35 +153,44 @@ class Trader:
 
         # International Prices
         observations = state.observations.conversionObservations[ORCHID]
-        #sunlight = observations.sunlight
-        #humidity = observations.humidity
+
         transport_fees = observations.transportFees 
         import_tariff = observations.importTariff
         export_tariff = observations.exportTariff
         south_bid = observations.bidPrice
         south_ask = observations.askPrice
-
+        
+        # Actual converted prices
         south_buy = south_bid + import_tariff + transport_fees
         south_sell = south_ask + export_tariff + transport_fees
 
-        curr_pos = self.position_limit[ORCHID]
+        orchid_pos = self.get_pos(ORCHID, state)
         conversion = 0
-        if best_local_bid > south_sell & curr_pos <= 0:
-            bid_volume = self.position_limit[ORCHID] + curr_pos
-            orders.append(Order(ORCHID, math.floor(best_local_bid), bid_volume))
-            return orders, conversion
-        if best_local_bid < south_sell & curr_pos > 0:
-            conversion = -curr_pos
-            return orders, conversion
-        # if best_local_ask - 0.5 > south_buy - 0.5 & curr_pos <= 0:
-        #     ask_volume = (self.position_limit[AMETHYSTS] + curr_pos)
-        #     orders.append(Order(ORCHID, best_local_bid, bid_volume))
-        #     return orders, conversion
-        # if best_local_ask - 0.5 > south_buy - 0.5 & curr_pos > 0:
-        #     ask_volume = self.position_limit[ORCHID] + curr_pos
-        #     conversion = -curr_pos
-        #     return orders, conversion
-
+        print(f"orchid_pos: {orchid_pos}")
+        # buy LOCAL sell SOUTH
+        # buy LOCAL (pos <= 0)
+        if best_local_bid < south_sell: 
+            if best_local_bid < south_sell and orchid_pos <= 0:
+                bid_volume = self.position_limit[ORCHID] - orchid_pos
+                orders.append(Order(ORCHID, math.ceil(best_local_bid), bid_volume))
+                #return orders, conversion
+            # sell SOUTH (pos > 0) # conversion = x (buying x)
+            if best_local_bid < south_sell and orchid_pos > 0:
+                conversion = -orchid_pos
+                #return orders, conversion
+        else:
+            # sell LOCAL buy SOUTH
+            # sell LOCAL (pos >= 0)
+            if south_buy < best_local_ask and orchid_pos >= 0:
+                ask_volume = -1 * (self.position_limit[ORCHID] - orchid_pos)
+                orders.append(Order(ORCHID, math.ceil(best_local_ask), ask_volume))
+                #return orders, conversion
+            # buy SOUTH (pos < 0) # conversion = -x (selling x)
+            if south_buy < best_local_ask and orchid_pos < 0: 
+                conversion = -orchid_pos
+                #return orders, conversion
+                
+        print(f"result: {orders}, Conversions: {conversion}")
         return orders, conversion
     
     def run(self, state: TradingState):
@@ -191,8 +200,8 @@ class Trader:
         
         # only running amethyst strategy
         result = {}
-        result[AMETHYSTS] = self.amethyst_strategy(state)
-        result[STARFRUIT] = self.starfruit_strategy(state)
+        #result[AMETHYSTS] = self.amethyst_strategy(state)
+        #result[STARFRUIT] = self.starfruit_strategy(state)
         result[ORCHID], conversions = self.orchid_strategy(state)
 
         # orchid_strat = self.get_orchid_strategy(state)
