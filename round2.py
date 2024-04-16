@@ -9,6 +9,8 @@ STARFRUIT = "STARFRUIT"
 SEASHELLS = "SEASHELLS"
 ORCHID = "ORCHIDS"
 
+# FIRST_ORCHID_ORDER = 0
+
 ASSETS = [
     STARFRUIT,
     SEASHELLS,
@@ -33,7 +35,11 @@ class Trader:
         self.position_limit = {
             AMETHYSTS : 20, 
             STARFRUIT : 20,
-            ORCHID :    5000, 
+            ORCHID :    100, 
+        }
+
+        self.south_pos_limit = {
+            ORCHID :    100, 
         }
 
         # self.round = 0
@@ -136,32 +142,48 @@ class Trader:
         return state.position.get(product, 0) 
     
     def orchid_strategy(self, state: TradingState):
-        
-        c_obs = state.observations.conversionObservations[ORCHID]
-        # p_obs = state.observations.plainValueObservations[ORCHID]
-
-        orchid_pos = self.get_pos(ORCHID, state)
-
-        # buy_cost = c_obs.bidPrice * (1 + (c_obs.importTariff / 100)) + c_obs.transportFees
-        # sell_cost = c_obs.askPrice * (1 + (c_obs.exportTariff / 100)) + c_obs.transportFees
-
-        bid_volume = self.position_limit[ORCHID] - orchid_pos
-        ask_volume = -1 * (self.position_limit[ORCHID] + orchid_pos)
         orders = []
-        # buy_cost = math.ceil(buy_cost)
-        # sell_cost = math.floor(sell_cost)
-        # if buy_cost < sell_cost:
-        orders.append(Order(ORCHID, int(c_obs.bidPrice) + 100, bid_volume))
-        orders.append(Order(ORCHID, int(c_obs.askPrice) - 100, ask_volume))
-        #print(f"buy_cost: , sell_cost: , ask, bid, import, export: ", c_obs.bidPrice, c_obs.askPrice, c_obs.importTariff, c_obs.exportTariff)
         
-        # orders.append(Order(AMETHYSTS, DEFAULT_PRICES[AMETHYSTS] - 2, bid_volume))
-        # orders.append(Order(AMETHYSTS, DEFAULT_PRICES[AMETHYSTS] + 2, ask_volume))
-        print(f"Tick {self.round}, Observations: ", str(state.observations))
-        return orders
-        
-        
+        # Local Prices
+        local_bids = state.order_depths[ORCHID].buy_orders
+        local_asks = state.order_depths[ORCHID].sell_orders
 
+        best_local_bid = max(local_bids)
+        best_local_ask = min(local_asks)
+
+        # International Prices
+        observations = state.observations.conversionObservations[ORCHID]
+        #sunlight = observations.sunlight
+        #humidity = observations.humidity
+        transport_fees = observations.transportFees 
+        import_tariff = observations.importTariff
+        export_tariff = observations.exportTariff
+        south_bid = observations.bidPrice
+        south_ask = observations.askPrice
+
+        south_buy = south_bid + import_tariff + transport_fees
+        south_sell = south_ask + export_tariff + transport_fees
+
+        curr_pos = self.position_limit[ORCHID]
+        conversion = 0
+        if best_local_bid > south_sell & curr_pos <= 0:
+            bid_volume = self.position_limit[ORCHID] + curr_pos
+            orders.append(Order(ORCHID, math.floor(best_local_bid), bid_volume))
+            return orders, conversion
+        if best_local_bid < south_sell & curr_pos > 0:
+            conversion = -curr_pos
+            return orders, conversion
+        # if best_local_ask - 0.5 > south_buy - 0.5 & curr_pos <= 0:
+        #     ask_volume = (self.position_limit[AMETHYSTS] + curr_pos)
+        #     orders.append(Order(ORCHID, best_local_bid, bid_volume))
+        #     return orders, conversion
+        # if best_local_ask - 0.5 > south_buy - 0.5 & curr_pos > 0:
+        #     ask_volume = self.position_limit[ORCHID] + curr_pos
+        #     conversion = -curr_pos
+        #     return orders, conversion
+
+        return orders, conversion
+    
     def run(self, state: TradingState):
 
         # logger.print("traderData: " + state.traderData)
@@ -169,13 +191,16 @@ class Trader:
         
         # only running amethyst strategy
         result = {}
-        #result[AMETHYSTS] = self.amethyst_strategy(state)
-        #result[STARFRUIT] = self.starfruit_strategy(state)
-        result[ORCHID] = self.orchid_strategy(state)
+        result[AMETHYSTS] = self.amethyst_strategy(state)
+        result[STARFRUIT] = self.starfruit_strategy(state)
+        result[ORCHID], conversions = self.orchid_strategy(state)
+
+        # orchid_strat = self.get_orchid_strategy(state)
+        # result[ORCHID] = self.orchid_strategy(state, orchid_strat)
     
         traderData = "SAMPLE" # String value holding Trader state data required. It will be delivered as TradingState.traderData on next execution.
         
-        conversions = 1
+        #conversions = 1
         
         # Need to flush to visualiser (include before return always)
         # logger.flush(state, result, conversions, traderData)
