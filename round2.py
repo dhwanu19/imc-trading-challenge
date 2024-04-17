@@ -167,29 +167,33 @@ class Trader:
         orchid_pos = self.get_pos(ORCHID, state)
         conversion = 0
         print(f"orchid_pos: {orchid_pos}")
-        # buy LOCAL sell SOUTH
-        # buy LOCAL (pos <= 0)
-        if best_local_bid < south_sell: 
-            if best_local_bid < south_sell and orchid_pos <= 0:
+
+        # finding the best arbitrage opportunity
+        buy_local_sell_south = best_local_bid + 3 - south_sell
+        sell_local_buy_south = best_local_ask - (south_buy + 3)
+
+        # if local buy price is cheaper than sourth sell price
+        if buy_local_sell_south > sell_local_buy_south and buy_local_sell_south < 0: 
+            # if we have a negative position on local (More sells than buys), we buy local at max 
+            if orchid_pos <= 0:
                 bid_volume = self.position_limit[ORCHID] - orchid_pos
-                orders.append(Order(ORCHID, math.ceil(best_local_bid), bid_volume))
-                #return orders, conversion
-            # sell SOUTH (pos > 0) # conversion = x (buying x)
-            if best_local_bid < south_sell and orchid_pos > 0:
+                replace_buy_amount = 1
+                orders.append(Order(ORCHID, math.ceil(best_local_bid + 3), replace_buy_amount))
+            # if we have we have a negative position locally, we buy on south at full amount (CHECK IF THERE IS RESTRICTION ON SOUTH BUY)
+            if orchid_pos > 0:
                 conversion = -orchid_pos
-                #return orders, conversion
-        else:
+        # else local sell price is more than south buy price
+        elif buy_local_sell_south < sell_local_buy_south and sell_local_buy_south > 0:
             # sell LOCAL buy SOUTH
             # sell LOCAL (pos >= 0)
-            if south_buy < best_local_ask and orchid_pos >= 0:
-                ask_volume = -1 * (self.position_limit[ORCHID] - orchid_pos)
-                orders.append(Order(ORCHID, math.ceil(best_local_ask), ask_volume))
-                #return orders, conversion
+            if orchid_pos >= 0:
+                ask_volume = -1 * (self.position_limit[ORCHID] + orchid_pos)
+                replace_sell_amount = -1
+                orders.append(Order(ORCHID, math.floor(best_local_ask - 3), replace_sell_amount))
             # buy SOUTH (pos < 0) # conversion = -x (selling x)
-            if south_buy < best_local_ask and orchid_pos < 0: 
+            if orchid_pos < 0: 
                 conversion = -orchid_pos
-                #return orders, conversion
-                
+        
         print(f"result: {orders}, Conversions: {conversion}")
         return orders, conversion
     
