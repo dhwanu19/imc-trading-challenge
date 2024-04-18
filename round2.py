@@ -176,24 +176,55 @@ class Trader:
         our_bid_volume = self.position_limit[ORCHID] - orchid_pos
         our_ask_volume = - self.position_limit[ORCHID] - orchid_pos
         print(f"local_ask/bid: {min_local_ask}, {max_local_bid}, import/export amount: {import_amount}, {export_amount}")
-        ## BUY LOCAL SELL SOUTH
-        if min_local_ask < export_amount or self.sell_south: # IF PROFITABLE (SELL SOUTH > BUY LOCAL)
-            if orchid_pos <= 0: # BUY
-                orders.append(Order(ORCHID, math.floor(export_amount), our_bid_volume))
-                self.sell_south = True
-            elif orchid_pos > 0: # SELL
+        
+        if self.sell_south:
+            if orchid_pos > 0:
                 conversion = -orchid_pos
                 self.sell_south = False
-                
-
-        ## BUY SOUTH SELL LOCAL
-        elif import_amount < max_local_bid or self.buy_south: # IF PROFITABLE (SELL LOCAL > BUY SOUTH)
-            if orchid_pos >= 0: # SELL
-                orders.append(Order(ORCHID, math.ceil(import_amount), our_ask_volume))   
-                self.buy_south = True
-            elif orchid_pos < 0: # BUY
+        elif self.buy_south:
+            if orchid_pos < 0:
                 conversion = -orchid_pos
                 self.buy_south = False
+        else:
+            local_ask_export_south = export_amount - min_local_ask
+            local_bid_import_south = max_local_bid - import_amount
+            
+            if local_ask_export_south > 0 and local_bid_import_south > 0:
+                if local_ask_export_south > local_bid_import_south:
+                    if orchid_pos <= 0:
+                        orders.append(Order(ORCHID, math.floor(export_amount), our_bid_volume))
+                        self.sell_south = True
+                else:
+                    if orchid_pos >= 0: # SELL
+                        orders.append(Order(ORCHID, math.ceil(import_amount), our_ask_volume))   
+                        self.buy_south = True
+            elif local_ask_export_south > 0 and local_bid_import_south <= 0:
+                if orchid_pos <= 0:
+                    orders.append(Order(ORCHID, math.floor(export_amount), our_bid_volume))
+                self.sell_south = True
+            elif local_ask_export_south <= 0 and local_bid_import_south > 0:
+                if orchid_pos >= 0: # SELL
+                    orders.append(Order(ORCHID, math.ceil(import_amount), our_ask_volume))   
+                    self.buy_south = True
+            
+        ## BUY LOCAL SELL SOUTH
+        # if min_local_ask < export_amount or self.sell_south: # IF PROFITABLE (SELL SOUTH > BUY LOCAL)
+        #     if orchid_pos <= 0: # BUY
+        #         orders.append(Order(ORCHID, math.floor(export_amount), our_bid_volume))
+        #         self.sell_south = True
+        #     elif orchid_pos > 0: # SELL
+        #         conversion = -orchid_pos
+        #         self.sell_south = False
+                
+
+        # ## BUY SOUTH SELL LOCAL
+        # elif import_amount < max_local_bid or self.buy_south: # IF PROFITABLE (SELL LOCAL > BUY SOUTH)
+        #     if orchid_pos >= 0: # SELL
+        #         orders.append(Order(ORCHID, math.ceil(import_amount), our_ask_volume))   
+        #         self.buy_south = True
+        #     elif orchid_pos < 0: # BUY
+        #         conversion = -orchid_pos
+        #         self.buy_south = False
  
         print(f"Our_bid_volume {our_bid_volume}, our_ask_volume: {our_ask_volume}")
         print(f"Orders: {orders}, conversions: {conversion}")
