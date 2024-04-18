@@ -1,5 +1,6 @@
+import pandas as pd
 from datamodel import OrderDepth, UserId, TradingState, Order
-from typing import List
+from typing import Dict, List, Union
 import string
 import math
 import numpy as np
@@ -23,6 +24,10 @@ ASSETS = [
     STARFRUIT,
     SEASHELLS,
     ORCHID,
+    CHOCOLATE,
+    STRAWBERRIES,
+    ROSES,
+    GIFT_BASKET,
 ]
 
 # Mean price specificed by IMC
@@ -71,10 +76,9 @@ class Trader:
         self.round = 0
         self.arbitrage_strat = False
 
-        self.buy_local = False
-        self.sell_local = False
-        self.buy_south = False
-        self.sell_south = False
+        self.prices : Dict[ASSETS, pd.Series] = { # type: ignore
+            "SPREAD":pd.Series(),
+        }
         
         
     def starfruit_strategy(self, state: TradingState):
@@ -224,7 +228,19 @@ class Trader:
            
         return orders, conversion
 
+    def save_prices_product(
+        self, 
+        product, 
+        state: TradingState,
+        price: Union[float, int, None] = None, 
+    ):
+        if not price:
+            price = self.get_mid_price(product, state)
 
+        self.prices[product] = pd.concat([
+            self.prices[product],
+            pd.Series({state.timestamp: price})
+        ])
 
 
     def round3_strategy(self, state: TradingState):
@@ -239,17 +255,17 @@ class Trader:
             
             if doBuyBasket:
                 volume_sign = 1
-                basket_price = math.floor(float("inf"))
+                basket_price = 1e7
                 individual_price = 1
             else:
                 volume_sign = -1
                 basket_price = 1
-                individual_price = math.floor(float("inf"))
+                individual_price = 1e7
 
-            basket_orders.append(GIFT_BASKET, basket_price, volume_sign * trade_volume)
-            chocolate_orders.append(CHOCOLATE, individual_price, 4 * volume_sign * trade_volume)
-            strawberry_orders.append(STRAWBERRIES, individual_price, 6 * volume_sign * trade_volume)
-            rose_orders.append(ROSES, individual_price, 1 * volume_sign * trade_volume)
+            basket_orders.append(Order(GIFT_BASKET, basket_price, volume_sign * trade_volume))
+            chocolate_orders.append(Order(CHOCOLATE, individual_price, 4 * volume_sign * trade_volume))
+            strawberry_orders.append(Order(STRAWBERRIES, individual_price, 6 * volume_sign * trade_volume))
+            rose_orders.append(Order(ROSES, individual_price, 1 * volume_sign * trade_volume))
 
 
         # Basket = 4C, 6S, 1R
