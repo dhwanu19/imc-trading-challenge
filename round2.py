@@ -2,14 +2,20 @@ from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import List
 import string
 import math
-
-
+import numpy as np
 
 
 AMETHYSTS = "AMETHYSTS"
 STARFRUIT = "STARFRUIT"
 SEASHELLS = "SEASHELLS"
 ORCHID = "ORCHIDS"
+
+CHOCOLATE = "CHOCOLATE"
+STRAWBERRIES = "STRAWBERRIES"
+ROSES = "ROSES"
+GIFT_BASKET = "GIFT_BASKET" # 4C, 6S, 1R
+
+WINDOW = 200
 
 # FIRST_ORCHID_ORDER = 0
 
@@ -24,11 +30,15 @@ DEFAULT_PRICES = {
     AMETHYSTS : 10_000,
     STARFRUIT : 5_000,
     ORCHID : None,
+    CHOCOLATE: 8000,
+    STRAWBERRIES: 4000,
+    ROSES: 14750,
+    GIFT_BASKET: 71000,
 }
 
 # visualiser custom logger (REMOVE FOR SUBMISSION and CONVERT PRINTS)
-# from logger import Logger
-# logger = Logger()
+from logger import Logger
+logger = Logger()
 
 class Trader:
     def __init__(self) -> None:
@@ -38,6 +48,10 @@ class Trader:
             AMETHYSTS : 20, 
             STARFRUIT : 20,
             ORCHID :    100, 
+            CHOCOLATE : 250,
+            STRAWBERRIES : 350,
+            ROSES : 60, 
+            GIFT_BASKET : 60,
         }
 
         self.south_pos_limit = {
@@ -144,6 +158,28 @@ class Trader:
         
         return (best_bid + best_ask)/2
 
+    def get_mid_price(self, product, state : TradingState):
+
+
+        default_price = DEFAULT_PRICES[product]
+
+        if product not in state.order_depths:
+            return default_price
+
+        market_bids = state.order_depths[product].buy_orders
+        if len(market_bids) == 0:
+            # There are no bid orders in the market (midprice undefined)
+            return default_price
+        
+        market_asks = state.order_depths[product].sell_orders
+        if len(market_asks) == 0:
+            # There are no bid orders in the market (mid_price undefined)
+            return default_price
+        
+        best_bid = max(market_bids)
+        best_ask = min(market_asks)
+        return (best_bid + best_ask)/2
+
     def get_pos(self, product, state: TradingState):
         # return state.position.get(product)
         # Investigate later
@@ -169,134 +205,102 @@ class Trader:
         max_local_bid = max(state.order_depths[ORCHID].buy_orders)      # max price bot is willing to buy at locally
         min_local_ask = min(state.order_depths[ORCHID].sell_orders)     # max price bot is selling to sell at locally
         
-
         orchid_pos = self.get_pos(ORCHID, state) # pos > 0 = own (buy), pos < 0 = owe (sell)
-
 
         our_bid_volume = self.position_limit[ORCHID] - orchid_pos
         our_ask_volume = - self.position_limit[ORCHID] - orchid_pos
-        print(f"local_ask/bid: {min_local_ask}, {max_local_bid}, import/export amount: {import_amount}, {export_amount}")
         
-        if self.sell_south:
-            if orchid_pos > 0:
-                conversion = -orchid_pos
-                self.sell_south = False
-        elif self.buy_south:
-            if orchid_pos < 0:
-                conversion = -orchid_pos
-                self.buy_south = False
+        local_ask_export_south = export_amount - min_local_ask
+        local_bid_import_south = max_local_bid - import_amount
+
+        if orchid_pos != 0:
+            conversion = -orchid_pos
+        # BUY LOCAL SELL SOUTH
+        elif local_ask_export_south < local_bid_import_south: # IF PROFITABLE (SELL SOUTH > BUY LOCAL)
+            orders.append(Order(ORCHID, math.ceil(import_amount), our_ask_volume))   
+        # BUY SOUTH SELL LOCAL
         else:
-            local_ask_export_south = export_amount - min_local_ask
-            local_bid_import_south = max_local_bid - import_amount
-            
-            if local_ask_export_south > 0 and local_bid_import_south > 0:
-                if local_ask_export_south > local_bid_import_south:
-                    if orchid_pos <= 0:
-                        orders.append(Order(ORCHID, math.floor(export_amount), our_bid_volume))
-                        self.sell_south = True
-                else:
-                    if orchid_pos >= 0: # SELL
-                        orders.append(Order(ORCHID, math.ceil(import_amount), our_ask_volume))   
-                        self.buy_south = True
-            elif local_ask_export_south > 0 and local_bid_import_south <= 0:
-                if orchid_pos <= 0:
-                    orders.append(Order(ORCHID, math.floor(export_amount), our_bid_volume))
-                self.sell_south = True
-            elif local_ask_export_south <= 0 and local_bid_import_south > 0:
-                if orchid_pos >= 0: # SELL
-                    orders.append(Order(ORCHID, math.ceil(import_amount), our_ask_volume))   
-                    self.buy_south = True
-            
-        ## BUY LOCAL SELL SOUTH
-        # if min_local_ask < export_amount or self.sell_south: # IF PROFITABLE (SELL SOUTH > BUY LOCAL)
-        #     if orchid_pos <= 0: # BUY
-        #         orders.append(Order(ORCHID, math.floor(export_amount), our_bid_volume))
-        #         self.sell_south = True
-        #     elif orchid_pos > 0: # SELL
-        #         conversion = -orchid_pos
-        #         self.sell_south = False
-                
-
-        # ## BUY SOUTH SELL LOCAL
-        # elif import_amount < max_local_bid or self.buy_south: # IF PROFITABLE (SELL LOCAL > BUY SOUTH)
-        #     if orchid_pos >= 0: # SELL
-        #         orders.append(Order(ORCHID, math.ceil(import_amount), our_ask_volume))   
-        #         self.buy_south = True
-        #     elif orchid_pos < 0: # BUY
-        #         conversion = -orchid_pos
-        #         self.buy_south = False
- 
-        print(f"Our_bid_volume {our_bid_volume}, our_ask_volume: {our_ask_volume}")
-        print(f"Orders: {orders}, conversions: {conversion}")
-        
-        
-        
+            orders.append(Order(ORCHID, math.floor(export_amount), our_bid_volume))
+           
         return orders, conversion
-        
-    
-    # def orchid_strategy(self, state: TradingState):
-    #     orders = []
-        
-    #     # Local Prices
-    #     local_bids = state.order_depths[ORCHID].buy_orders
-    #     local_asks = state.order_depths[ORCHID].sell_orders
 
-    #     best_local_bid = max(local_bids)
-    #     best_local_ask = min(local_asks)
 
-    #     local_sell = best_local_bid
-    #     local_buy = best_local_ask
 
-    #     # International Prices
-    #     observations = state.observations.conversionObservations[ORCHID]
 
-    #     transport_fees = observations.transportFees 
-    #     import_tariff = observations.importTariff
-    #     export_tariff = observations.exportTariff
-    #     south_bid = observations.bidPrice
-    #     south_ask = observations.askPrice
-        
-    #     # Actual converted prices
-    #     south_buy = south_ask + import_tariff + transport_fees
-    #     south_sell = south_bid - export_tariff - transport_fees
+    def round3_strategy(self, state: TradingState):
+        chocolate_orders = []
+        strawberry_orders = []
+        rose_orders = []
+        basket_orders = []
 
-    #     orchid_pos = self.get_pos(ORCHID, state)
-    #     conversion = 0
-    #     print(f"orchid_pos: {orchid_pos}, import/export tariff: {import_tariff}, {export_tariff}, transport fee: {transport_fees}")
+        def create_round3_orders(doBuyBasket: bool) -> List[List[Order]]:
+            # Basket = 4C, 6S, 1R
+            trade_volume = 2
+            
+            if doBuyBasket:
+                volume_sign = 1
+                basket_price = math.floor(float("inf"))
+                individual_price = 1
+            else:
+                volume_sign = -1
+                basket_price = 1
+                individual_price = math.floor(float("inf"))
 
-    #     # var for tweaking
-    #     diff = 1
-    #     # trade_amount = 50
+            basket_orders.append(GIFT_BASKET, basket_price, volume_sign * trade_volume)
+            chocolate_orders.append(CHOCOLATE, individual_price, 4 * volume_sign * trade_volume)
+            strawberry_orders.append(STRAWBERRIES, individual_price, 6 * volume_sign * trade_volume)
+            rose_orders.append(ROSES, individual_price, 1 * volume_sign * trade_volume)
 
-    #     # finding the best arbitrage opportunity
-    #     buy_local_sell_south = south_sell - (local_buy + diff)
-    #     sell_local_buy_south = local_sell - (south_buy + diff) 
-    #     print(f"South buy and sell: {south_buy}, {south_sell}, best local bid and ask: {best_local_bid}, {best_local_ask}, south ask/bid: {south_ask}, {south_bid}")
-    #     # if local buy price is cheaper than sourth sell price
-    #     if buy_local_sell_south > sell_local_buy_south and buy_local_sell_south > 0: 
-    #         # if we have a negative position on local (More sells than buys), we buy local at max 
-    #         if orchid_pos <= 0:
-    #             ask_volume = -1 * (self.position_limit[ORCHID] + orchid_pos)
-    #             #replace_buy_amount = trade_amount
-    #             orders.append(Order(ORCHID, math.floor(south_bid + diff), ask_volume))
-    #         # if we have we have a negative position locally, we buy on south at full amount (CHECK IF THERE IS RESTRICTION ON SOUTH BUY)
-    #         elif orchid_pos > 0:
-    #             conversion = -orchid_pos
-    #     # else local sell price is more than south buy price
-    #     elif buy_local_sell_south < sell_local_buy_south and sell_local_buy_south > 0:
-    #         # sell LOCAL buy SOUTH
-    #         # sell LOCAL (pos >= 0)
-    #         if orchid_pos >= 0:
-    #             bid_volume = self.position_limit[ORCHID] - orchid_pos
-    #             #replace_sell_amount = -trade_amount
-    #             orders.append(Order(ORCHID, math.ceil(south_ask - diff), bid_volume))
-    #         # buy SOUTH (pos < 0) # conversion = -x (selling x)
-    #         elif orchid_pos < 0: 
-    #             conversion = -orchid_pos
-        
-    #     print(f"result: {orders}, Conversions: {conversion}")
-        return orders, conversion
-    
+
+        # Basket = 4C, 6S, 1R
+        basket_mp = self.get_mid_price(GIFT_BASKET, state)
+        chocolate_mp = self.get_mid_price(CHOCOLATE, state)
+        strawberry_mp = self.get_mid_price(STRAWBERRIES, state)
+        rose_mp = self.get_mid_price(ROSES, state)
+
+        basket_pos = self.get_pos(GIFT_BASKET, state)
+
+        spread = basket_mp - (4 * chocolate_mp + 6 * strawberry_mp + rose_mp)
+
+        self.save_prices_product(
+            "SPREAD",
+            state,
+            spread
+        )
+
+        avg_spread = self.prices["SPREAD"].rolling(WINDOW).mean()
+        std_spread = self.prices["SPREAD"].rolling(WINDOW).std()
+        spread_5 = self.prices["SPREAD"].rolling(5).mean()
+
+        if not np.isnan(avg_spread.iloc[-1]):
+            avg_spread = avg_spread.iloc[-1]
+            std_spread = std_spread.iloc[-1]
+            spread_5 = spread_5.iloc[-1]
+            print(f"Average spread: {avg_spread}, Spread5: {spread_5}, Std: {std_spread}")
+
+
+            if abs(basket_pos) <= self.position_limit[GIFT_BASKET] - 2:
+                if spread_5 < avg_spread - 2*std_spread:  # buy basket
+                    buy_basket = True
+                    create_round3_orders(buy_basket)
+
+                elif spread_5 > avg_spread + 2*std_spread: # sell basket
+                    buy_basket = False 
+                    create_round3_orders(buy_basket)
+
+            else: # abs(position_basket) >= POSITION_LIMITS[PICNIC_BASKET]-10
+                if basket_pos > 0 : # sell basket
+                    if spread_5 > avg_spread + 2*std_spread:
+                        buy_basket = False
+                        create_round3_orders(buy_basket)
+
+                else: # buy basket
+                    if spread_5 < avg_spread - 2*std_spread:
+                        buy_basket = True
+                        create_round3_orders(buy_basket)
+
+        return basket_orders, chocolate_orders, strawberry_orders, rose_orders
+
     def run(self, state: TradingState):
 
         # logger.print("traderData: " + state.traderData)
@@ -304,10 +308,13 @@ class Trader:
         
         # only running amethyst strategy
         result = {}
-        #result[AMETHYSTS] = self.amethyst_strategy(state)
-        #result[STARFRUIT] = self.starfruit_strategy(state)
-        result[ORCHID], conversions = self.orchid_strategy(state)
+        conversions = 0
+        # result[AMETHYSTS] = self.amethyst_strategy(state)
+        # result[STARFRUIT] = self.starfruit_strategy(state)
+        # result[ORCHID], conversions = self.orchid_strategy(state)
 
+        
+        result[GIFT_BASKET], result[CHOCOLATE], result[STRAWBERRIES], result[ROSES] = self.round3_strategy(state)
         # orchid_strat = self.get_orchid_strategy(state)
         # result[ORCHID] = self.orchid_strategy(state, orchid_strat)
     
@@ -316,7 +323,7 @@ class Trader:
         #conversions = 1
         
         # Need to flush to visualiser (include before return always)
-        # logger.flush(state, result, conversions, traderData)
+        logger.flush(state, result, conversions, traderData)
         self.round += 1
         return result, conversions, traderData
 
