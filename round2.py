@@ -42,8 +42,8 @@ DEFAULT_PRICES = {
 }
 
 # visualiser custom logger (REMOVE FOR SUBMISSION and CONVERT PRINTS)
-from logger import Logger
-logger = Logger()
+# from logger import Logger
+# logger = Logger()
 
 class Trader:
     def __init__(self) -> None:
@@ -236,7 +236,7 @@ class Trader:
     ):
         if not price:
             price = self.get_mid_price(product, state)
-
+        
         self.prices[product] = pd.concat([
             self.prices[product],
             pd.Series({state.timestamp: price})
@@ -248,10 +248,11 @@ class Trader:
         strawberry_orders = []
         rose_orders = []
         basket_orders = []
-
+        diff = 2.5
+        spread_num = 4
         def create_round3_orders(doBuyBasket: bool) -> List[List[Order]]:
             # Basket = 4C, 6S, 1R
-            trade_volume = 2
+            trade_volume = diff # TRY MODIFY THIS ONE HERE #################################
             
             if doBuyBasket:
                 volume_sign = 1
@@ -267,7 +268,7 @@ class Trader:
             strawberry_orders.append(Order(STRAWBERRIES, individual_price, 6 * volume_sign * trade_volume))
             rose_orders.append(Order(ROSES, individual_price, 1 * volume_sign * trade_volume))
 
-
+        # DIFFERENT Z VALUES FOR SPREAD 
         # Basket = 4C, 6S, 1R
         basket_mp = self.get_mid_price(GIFT_BASKET, state)
         chocolate_mp = self.get_mid_price(CHOCOLATE, state)
@@ -286,32 +287,33 @@ class Trader:
 
         avg_spread = self.prices["SPREAD"].rolling(WINDOW).mean()
         std_spread = self.prices["SPREAD"].rolling(WINDOW).std()
-        spread_5 = self.prices["SPREAD"].rolling(5).mean()
+        # TRY OTHER VALUES OTHER THAN 5 
+        spread_n = self.prices["SPREAD"].rolling(spread_num).mean()
 
         if not np.isnan(avg_spread.iloc[-1]):
             avg_spread = avg_spread.iloc[-1]
             std_spread = std_spread.iloc[-1]
-            spread_5 = spread_5.iloc[-1]
-            print(f"Average spread: {avg_spread}, Spread5: {spread_5}, Std: {std_spread}")
+            spread_n = spread_n.iloc[-1]
+            print(f"Average spread: {avg_spread}, spread_n: {spread_n}, Std: {std_spread}")
 
-
-            if abs(basket_pos) <= self.position_limit[GIFT_BASKET] - 2:
-                if spread_5 < avg_spread - 2*std_spread:  # buy basket
+            
+            if abs(basket_pos) <= self.position_limit[GIFT_BASKET] - diff: # MIGHT HAVE TO MODIFY THIS 2 ACCORDINGL
+                if spread_n < avg_spread - 2*std_spread:  # buy basket
                     buy_basket = True
                     create_round3_orders(buy_basket)
 
-                elif spread_5 > avg_spread + 2*std_spread: # sell basket
+                elif spread_n > avg_spread + 2*std_spread: # sell basket
                     buy_basket = False 
                     create_round3_orders(buy_basket)
 
             else: # abs(position_basket) >= POSITION_LIMITS[PICNIC_BASKET]-10
                 if basket_pos > 0 : # sell basket
-                    if spread_5 > avg_spread + 2*std_spread:
+                    if spread_n > avg_spread + 2*std_spread:
                         buy_basket = False
                         create_round3_orders(buy_basket)
 
                 else: # buy basket
-                    if spread_5 < avg_spread - 2*std_spread:
+                    if spread_n < avg_spread - 2*std_spread:
                         buy_basket = True
                         create_round3_orders(buy_basket)
 
@@ -325,21 +327,20 @@ class Trader:
         # only running amethyst strategy
         result = {}
         conversions = 0
-        # result[AMETHYSTS] = self.amethyst_strategy(state)
-        # result[STARFRUIT] = self.starfruit_strategy(state)
-        # result[ORCHID], conversions = self.orchid_strategy(state)
+        result[AMETHYSTS] = self.amethyst_strategy(state)
+        result[STARFRUIT] = self.starfruit_strategy(state)
+        result[ORCHID], conversions = self.orchid_strategy(state)
 
         
         result[GIFT_BASKET], result[CHOCOLATE], result[STRAWBERRIES], result[ROSES] = self.round3_strategy(state)
-        # orchid_strat = self.get_orchid_strategy(state)
-        # result[ORCHID] = self.orchid_strategy(state, orchid_strat)
+
     
         traderData = "SAMPLE" # String value holding Trader state data required. It will be delivered as TradingState.traderData on next execution.
         
         #conversions = 1
         
         # Need to flush to visualiser (include before return always)
-        logger.flush(state, result, conversions, traderData)
+        # logger.flush(state, result, conversions, traderData)
         self.round += 1
         return result, conversions, traderData
 
